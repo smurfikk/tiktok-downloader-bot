@@ -8,12 +8,15 @@ import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters import BoundFilter
+from aiogram.types import CallbackQuery, Message
 
 import config
 import functions
+from menu import main_menu
 
 logging.basicConfig(filename=f"logs.log", format='%(asctime)s - %(levelname)s - %(message)s', level=logging.ERROR)
-bot = Bot(token=config.bot_token)
+bot = Bot(token=config.bot_token, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MemoryStorage())
 
 start_text = """
@@ -30,6 +33,28 @@ async def handler_start(message: types.Message, state: FSMContext):
         await message.answer("Отправьте сообщение для рассылки (текст, фото, видео или гиф)")
     else:
         await message.answer(start_text)
+
+
+class IsAdmin(BoundFilter):
+    async def check(self, message: Message):
+        if message.chat.type != "private":
+            return False
+        return message.from_user.id in config.admin_id
+
+
+@dp.message_handler(IsAdmin(), commands=["start", "admin"])
+async def handler_admin_menu(message: Message):
+    await message.answer("<b>Главное меню</b>", reply_markup=main_menu())
+
+
+@dp.callback_query_handler(regexp=r"^admin_menu$")
+async def handler_call_admin_menu(call: CallbackQuery):
+    await call.message.edit_text("<b>Главное меню</b>", reply_markup=main_menu())
+
+
+@dp.callback_query_handler(regexp=r"^statistic$")
+async def handler_call_statistic(call: CallbackQuery):
+    await call.message.edit_text(functions.admin_stats(), reply_markup=main_menu())
 
 
 @dp.message_handler(state="Email.message", content_types=['text', 'photo', 'video', 'gif', 'animation'])
